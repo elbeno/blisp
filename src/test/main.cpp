@@ -241,6 +241,9 @@ FormPtr read_atom(Reader& r)
   if (t == "false") {
     return make_unique<False>();
   }
+  if (t[0] == ';') {
+    return nullptr;
+  }
   return make_unique<Symbol>(std::move(t));
 }
 
