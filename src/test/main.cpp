@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <iostream>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <regex>
 #include <string>
@@ -101,14 +102,33 @@ public:
 
 //------------------------------------------------------------------------------
 
+struct Form;
+using FormPtr = unique_ptr<Form>;
+
+class Environment
+{
+public:
+  Environment() {}
+
+  const Form* lookup(const string& s)
+  {
+    auto i = m_bindings.find(s);
+    if (i == m_bindings.end()) return nullptr;
+    return i->second;
+  }
+
+private:
+  map<string, const Form*> m_bindings;
+};
+
+//------------------------------------------------------------------------------
+
 struct Form
 {
   virtual ~Form() {}
-  virtual const Form* eval() const { return this; }
+  virtual const Form* eval(Environment&) const { return this; }
   virtual string print() const { return "<form>"; }
 };
-
-using FormPtr = unique_ptr<Form>;
 
 struct Nil : public Form
 {
@@ -124,6 +144,12 @@ struct False : public Form
 {
   virtual string print() const { return "false"; }
 };
+
+const Form* apply(const Form*, vector<const Form*>&)
+{
+  cout << "applied function" << endl;
+  return nullptr;
+}
 
 struct List : public Form
 {
@@ -145,6 +171,28 @@ struct List : public Form
     }
     s.push_back(')');
     return s;
+  }
+
+  virtual const Form* eval(Environment& e) const
+  {
+    auto s = m_elements[0]->print();
+    auto f = e.lookup(s);
+    if (!f) {
+      cout << "Unbound symbol: " << s << endl;
+      return nullptr;
+    }
+
+    vector<const Form*> args;
+    if (!all_of(m_elements.cbegin()+1, m_elements.cend(),
+               [&args, &e] (const FormPtr& arg) {
+                 auto f = arg->eval(e);
+                 if (!f) return false;
+                 args.push_back(f);
+                 return true;
+               })) {
+      return nullptr;
+    }
+    return apply(f, args);
   }
 
   vector<FormPtr> m_elements;
@@ -190,6 +238,15 @@ struct Symbol : public Form
 {
   Symbol(const string& s) : m_value(s) {}
   virtual string print() const { return m_value; }
+
+  virtual const Form* eval(Environment& e) const
+  {
+    auto f = e.lookup(m_value);
+    if (!f) {
+      cout << "Unbound symbol: " << m_value << endl;
+    }
+    return f;
+  }
 
   string m_value;
 };
@@ -272,9 +329,9 @@ auto read(const string& s)
 
 //------------------------------------------------------------------------------
 
-auto eval(const Form* form)
+auto eval(const Form* form, Environment& e)
 {
-  return form->eval();
+  return form->eval(e);
 }
 
 //------------------------------------------------------------------------------
@@ -288,6 +345,7 @@ static const char *prompt = "blisp> ";
 
 int main()
 {
+  Environment base_env;
   string line;
   do
   {
@@ -295,7 +353,10 @@ int main()
     if (!getline(cin, line)) break;
     auto readform = read(line);
     if (readform) {
-      print(eval(readform.get()));
+      auto f = eval(readform.get(), base_env);
+      if (f) {
+        print(f);
+      }
     }
   } while (true);
 
