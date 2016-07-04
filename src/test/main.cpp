@@ -497,6 +497,26 @@ FormPtr eval_set(const vector<FormPtr>& v, Environment& e)
   return r;
 }
 
+FormPtr eval_quote(const vector<FormPtr>& v, Environment&)
+{
+  if (v.size() != 2) {
+    cout << "Wrong number of arguments to quote, expecting 1, got "
+         << v.size()-1 << endl;
+    return nullptr;
+  }
+  return v[1];
+}
+
+FormPtr eval_begin(const vector<FormPtr>& v, Environment& e)
+{
+  FormPtr f;
+  for (auto i = v.cbegin()+1; i != v.cend(); ++i)
+  {
+    f = (*i)->eval(e);
+  }
+  return f;
+}
+
 FormPtr eval_list(const vector<FormPtr>& v, Environment& e)
 {
   if (v.front()->symb_eq("let")) {
@@ -510,6 +530,12 @@ FormPtr eval_list(const vector<FormPtr>& v, Environment& e)
   }
   if (v.front()->symb_eq("set!")) {
     return eval_set(v, e);
+  }
+  if (v.front()->symb_eq("quote")) {
+    return eval_quote(v, e);
+  }
+  if (v.front()->symb_eq("begin")) {
+    return eval_begin(v, e);
   }
 
   auto form = v.front()->eval(e);
