@@ -14,6 +14,14 @@
 using namespace std;
 
 //------------------------------------------------------------------------------
+// TODOs:
+// lambdas close over values in env (lexical scope)
+// lazy tokenization
+// get rid of dynamic casts
+// too much shared_ptr overuse
+// TCO
+// other lisp features
+//------------------------------------------------------------------------------
 
 namespace
 {
@@ -77,12 +85,9 @@ vector<Token> tokenizer(const string& s)
   static const regex re(tokenPattern, regex::extended);
 
   vector<Token> v;
-  for (auto i = sregex_iterator(s.cbegin(), s.cend(), re);
-       i != sregex_iterator();
-       ++i)
-  {
-    v.push_back(i->str(1));
-  }
+  transform(sregex_iterator(s.cbegin(), s.cend(), re), sregex_iterator(),
+            back_inserter(v),
+            [] (const auto& m) { return m.str(1); });
   return v;
 }
 
@@ -440,8 +445,6 @@ FormPtr eval_lambda(const vector<FormPtr>& v, Environment&)
     cout << "First argument to lambda must be a list" << endl;
     return nullptr;
   }
-
-  // TODO: close over values in env (lexical scope)
 
   vector<string> params;
   for (const auto& f : l->m_elements)
