@@ -96,19 +96,28 @@ public:
 
 //------------------------------------------------------------------------------
 
-auto read(const string& s)
+struct Form
 {
-  return s;
+  virtual ~Form() {}
+  virtual const Form eval() { return *this; }
+  virtual string print() const { return "<form>"; }
+};
+
+//------------------------------------------------------------------------------
+
+auto read(const string&)
+{
+  return Form{};
 }
 
-auto eval(const string& form)
+auto eval(const Form& form)
 {
   return form;
 }
 
-void print(const string& s)
+void print(const Form& form)
 {
-  cout << s << endl;
+  cout << form.print() << endl;
 }
 
 static const char *prompt = "blisp> ";
