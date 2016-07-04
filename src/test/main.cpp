@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <iostream>
 #include <iterator>
+#include <memory>
 #include <regex>
 #include <string>
 #include <utility>
@@ -27,6 +28,8 @@ namespace
       } else if (*first == '\\'
                  || *first == '\"') {
         *dest++ = '\\';
+        *dest++ = *first;
+      } else {
         *dest++ = *first;
       }
     }
@@ -90,6 +93,7 @@ public:
 
   Token next() { return m_tokens[pos++]; }
   Token peek() const { return m_tokens[pos]; }
+  bool empty() const { return m_tokens.empty(); }
 
   vector<Token> m_tokens;
   size_t pos = 0;
@@ -100,9 +104,11 @@ public:
 struct Form
 {
   virtual ~Form() {}
-  virtual const Form eval() { return *this; }
+  virtual const Form* eval() const { return this; }
   virtual string print() const { return "<form>"; }
 };
+
+using FormPtr = unique_ptr<Form>;
 
 struct Nil : public Form
 {
@@ -121,8 +127,7 @@ struct False : public Form
 
 struct List : public Form
 {
-  List(const vector<Form>& v) : m_elements(v) {}
-  List(vector<Form>&& v) : m_elements(std::move(v)) {}
+  List(vector<FormPtr>&& v) : m_elements(std::move(v)) {}
 
   virtual string print() const
   {
@@ -130,26 +135,26 @@ struct List : public Form
     s.push_back('(');
     auto i = m_elements.cbegin();
     if (i != m_elements.cend()) {
-      s += i->print();
+      s += (*i)->print();
       ++i;
     }
     while (i != m_elements.cend()) {
       s.push_back(' ');
-      s += i->print();
+      s += (*i)->print();
       ++i;
     }
     s.push_back(')');
     return s;
   }
 
-  vector<Form> m_elements;
+  vector<FormPtr> m_elements;
 };
 
 struct String : public Form
 {
   String(const string& s)
   {
-    unescape(s.cbegin(), s.cend(),
+    unescape(s.cbegin()+1, s.cend()-1,
              back_inserter(m_value));
   }
 
@@ -191,11 +196,11 @@ struct Symbol : public Form
 
 //------------------------------------------------------------------------------
 
-Form read_form(Reader& r);
+FormPtr read_form(Reader& r);
 
-Form read_list(Reader& r)
+FormPtr read_list(Reader& r)
 {
-  vector<Form> v;
+  vector<FormPtr> v;
 
   r.next(); // skip open paren
   while (r.peek()[0] != ')')
@@ -206,32 +211,34 @@ Form read_list(Reader& r)
 
   if (v.empty())
   {
-    return Nil{};
+    return make_unique<Nil>();
   }
-  return List(std::move(v));
+  return make_unique<List>(std::move(v));
 }
 
-Form read_atom(Reader& r)
+FormPtr read_atom(Reader& r)
 {
   auto t = r.next();
 
   if (t[0] == '"') {
-    return String(std::move(t));
+    return make_unique<String>(std::move(t));
   }
   if (isdigit(t[0])) {
-    return Number(std::move(t));
+    return make_unique<Number>(std::move(t));
   }
   if (t == "true") {
-    return True{};
+    return make_unique<True>();
   }
   if (t == "false") {
-    return False{};
+    return make_unique<False>();
   }
-  return Symbol(std::move(t));
+  return make_unique<Symbol>(std::move(t));
 }
 
-Form read_form(Reader& r)
+FormPtr read_form(Reader& r)
 {
+  if (r.empty()) return nullptr;
+
   auto t = r.peek();
   switch (t[0])
   {
@@ -253,14 +260,16 @@ auto read(const string& s)
 
 //------------------------------------------------------------------------------
 
-auto eval(const Form& form)
+auto eval(const Form* form)
 {
-  return form;
+  return form->eval();
 }
 
-void print(const Form& form)
+//------------------------------------------------------------------------------
+
+void print(const Form* form)
 {
-  cout << form.print() << endl;
+  cout << form->print() << endl;
 }
 
 static const char *prompt = "blisp> ";
@@ -273,9 +282,9 @@ int main()
     cout << prompt;
     if (!getline(cin, line)) break;
     auto readform = read(line);
-    auto evalform = eval(readform);
-    print(evalform);
-
+    if (readform) {
+      print(eval(readform.get()));
+    }
   } while (true);
 
   return 0;
