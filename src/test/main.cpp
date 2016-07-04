@@ -122,8 +122,25 @@ struct False : public Form
 struct List : public Form
 {
   List(const vector<Form>& v) : m_elements(v) {}
+  List(vector<Form>&& v) : m_elements(std::move(v)) {}
 
-  virtual string print() const { return "list"; }
+  virtual string print() const
+  {
+    string s;
+    s.push_back('(');
+    auto i = m_elements.cbegin();
+    if (i != m_elements.cend()) {
+      s += i->print();
+      ++i;
+    }
+    while (i != m_elements.cend()) {
+      s.push_back(' ');
+      s += i->print();
+      ++i;
+    }
+    s.push_back(')');
+    return s;
+  }
 
   vector<Form> m_elements;
 };
@@ -191,7 +208,7 @@ Form read_list(Reader& r)
   {
     return Nil{};
   }
-  return List(v);
+  return List(std::move(v));
 }
 
 Form read_atom(Reader& r)
@@ -199,10 +216,10 @@ Form read_atom(Reader& r)
   auto t = r.next();
 
   if (t[0] == '"') {
-    return String(t);
+    return String(std::move(t));
   }
   if (isdigit(t[0])) {
-    return Number(t);
+    return Number(std::move(t));
   }
   if (t == "true") {
     return True{};
@@ -210,7 +227,7 @@ Form read_atom(Reader& r)
   if (t == "false") {
     return False{};
   }
-  return Symbol(t);
+  return Symbol(std::move(t));
 }
 
 Form read_form(Reader& r)
