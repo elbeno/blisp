@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <iostream>
 #include <iterator>
@@ -103,12 +104,137 @@ struct Form
   virtual string print() const { return "<form>"; }
 };
 
+struct Nil : public Form
+{
+  virtual string print() const { return "nil"; }
+};
+
+struct True : public Form
+{
+  virtual string print() const { return "true"; }
+};
+
+struct False : public Form
+{
+  virtual string print() const { return "false"; }
+};
+
+struct List : public Form
+{
+  List(const vector<Form>& v) : m_elements(v) {}
+
+  virtual string print() const { return "list"; }
+
+  vector<Form> m_elements;
+};
+
+struct String : public Form
+{
+  String(const string& s)
+  {
+    unescape(s.cbegin(), s.cend(),
+             back_inserter(m_value));
+  }
+
+  virtual string print() const
+  {
+    string s;
+    s.push_back('"');
+    escape(m_value.cbegin(), m_value.cend(),
+           back_inserter(s));
+    s.push_back('"');
+    return s;
+  }
+
+  string m_value;
+};
+
+struct Number : public Form
+{
+  Number(const string& s)
+  {
+    m_value = stoi(s);
+  }
+
+  virtual string print() const
+  {
+    return to_string(m_value);
+  }
+
+  int m_value;
+};
+
+struct Symbol : public Form
+{
+  Symbol(const string& s) : m_value(s) {}
+  virtual string print() const { return m_value; }
+
+  string m_value;
+};
+
 //------------------------------------------------------------------------------
 
-auto read(const string&)
+Form read_form(Reader& r);
+
+Form read_list(Reader& r)
 {
-  return Form{};
+  vector<Form> v;
+
+  r.next(); // skip open paren
+  while (r.peek()[0] != ')')
+  {
+    v.push_back(read_form(r));
+  }
+  r.next(); // eat close paren
+
+  if (v.empty())
+  {
+    return Nil{};
+  }
+  return List(v);
 }
+
+Form read_atom(Reader& r)
+{
+  auto t = r.next();
+
+  if (t[0] == '"') {
+    return String(t);
+  }
+  if (isdigit(t[0])) {
+    return Number(t);
+  }
+  if (t == "true") {
+    return True{};
+  }
+  if (t == "false") {
+    return False{};
+  }
+  return Symbol(t);
+}
+
+Form read_form(Reader& r)
+{
+  auto t = r.peek();
+  switch (t[0])
+  {
+    case '(':
+      return read_list(r);
+      break;
+    default:
+      return read_atom(r);
+      break;
+  }
+}
+
+auto read(const string& s)
+{
+  auto t = tokenizer(s);
+  auto r = Reader(std::move(t));
+  return read_form(r);
+}
+
+//------------------------------------------------------------------------------
 
 auto eval(const Form& form)
 {
