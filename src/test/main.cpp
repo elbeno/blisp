@@ -478,6 +478,25 @@ FormPtr apply(const Function& f,
   return f.apply(apply_env);
 }
 
+FormPtr eval_set(const vector<FormPtr>& v, Environment& e)
+{
+  if (v.size() != 3) {
+    cout << "Wrong number of arguments to set!, expecting 2, got "
+         << v.size()-1 << endl;
+    return nullptr;
+  }
+
+  Symbol* s = dynamic_cast<Symbol*>(v[1].get());
+  if (!s) {
+    cout << "First argument to set! must be a symbol" << endl;
+    return nullptr;
+  }
+
+  auto r = v[2]->eval(e);
+  e.set(s->print(), r);
+  return r;
+}
+
 FormPtr eval_list(const vector<FormPtr>& v, Environment& e)
 {
   if (v.front()->symb_eq("let")) {
@@ -488,6 +507,9 @@ FormPtr eval_list(const vector<FormPtr>& v, Environment& e)
   }
   if (v.front()->symb_eq("lambda")) {
     return eval_lambda(v, e);
+  }
+  if (v.front()->symb_eq("set!")) {
+    return eval_set(v, e);
   }
 
   auto form = v.front()->eval(e);
