@@ -93,7 +93,7 @@ public:
 
   Token next() { return m_tokens[pos++]; }
   Token peek() const { return m_tokens[pos]; }
-  bool empty() const { return m_tokens.empty(); }
+  bool empty() const { return pos >= m_tokens.size(); }
 
   vector<Token> m_tokens;
   size_t pos = 0;
@@ -203,9 +203,18 @@ FormPtr read_list(Reader& r)
   vector<FormPtr> v;
 
   r.next(); // skip open paren
+  if (r.empty()) {
+    cout << "Error: unterminated read (list)" << endl;
+    return nullptr;
+  }
+
   while (r.peek()[0] != ')')
   {
     v.push_back(read_form(r));
+    if (r.empty()) {
+      cout << "Error: unterminated read (list)" << endl;
+      return nullptr;
+    }
   }
   r.next(); // eat close paren
 
