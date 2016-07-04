@@ -1,23 +1,37 @@
-#include <dummy.h>
-#include <gsl.h>
+#include <iostream>
+#include <string>
 
-#define TESTINATOR_MAIN
-#include <testinator.h>
+using namespace std;
 
-DEF_TEST(Name, Suite)
+static const char *prompt = "blisp> ";
+
+auto read(const string& s)
 {
-  return true;
+  return s;
 }
 
-DEF_TIMED_TEST(Name2, Suite)
+auto eval(const string& form)
 {
+  return form;
 }
 
-DEF_PROPERTY(Name3, Suite, int)
+void print(const string& s)
 {
-  return true;
+  cout << s << endl;
 }
 
-DEF_COMPLEXITY_PROPERTY(Name4, Suite, ORDER_N, int)
+int main()
 {
+  string line;
+  do
+  {
+    cout << prompt;
+    if (!getline(cin, line)) break;
+    auto readform = read(line);
+    auto evalform = eval(readform);
+    print(evalform);
+
+  } while (true);
+
+  return 0;
 }
